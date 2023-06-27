@@ -1,0 +1,137 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <string.h>
+
+
+#define MAX_PIXEL_VALUE 255
+
+// Função para ler uma imagem PGM
+int** readPGM(const char* filename, int* width, int* height) {
+    FILE* file = fopen(filename, "rb");
+    if (!file) {
+        printf("Erro ao abrir o arquivo %s\n", filename);
+        return NULL;
+    }
+
+    // Lê o cabeçalho da imagem PGM
+    char format[3];
+    fscanf(file, "%s", format);
+    if (format[0] != 'P' || format[1] != '2') {
+        printf("Formato de arquivo inválido. Esperado: P5\n");
+        fclose(file);
+        return NULL;
+    }
+
+    fscanf(file, "%d %d", width, height);
+    int maxVal;
+    fscanf(file, "%d", &maxVal);
+    if (maxVal != MAX_PIXEL_VALUE) {
+        printf("Valor máximo de pixel inválido. Esperado: %d\n", MAX_PIXEL_VALUE);
+        fclose(file);
+        return NULL;
+    }
+
+    // Aloca memória para a matriz de pixels
+    int** image = (int**)malloc(*height * sizeof(int*));
+    for (int i = 0; i < *height; i++) {
+        image[i] = (int*)malloc(*width * sizeof(int));
+    }
+
+    // Lê os pixels da imagem
+    for (int i = 0; i < *height; i++) {
+        for (int j = 0; j < *width; j++) {
+            image[i][j] = fgetc(file);
+        }
+    }
+
+    fclose(file);
+    return image;
+}
+
+// Função para liberar a memória alocada para a imagem
+void freeImage(int** image, int height) {
+    for (int i = 0; i < height; i++) {
+        free(image[i]);
+    }
+    free(image);
+}
+
+// Função para calcular o histograma de uma imagem
+void calculateHistogram(int** image, int width, int height, int* histogram) {
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < width; j++) {
+            histogram[image[i][j]]++;
+        }
+    }
+}
+
+// Função para calcular a correlação de Pearson entre dois histogramas
+double calculateSimilarity(int* hist1, int* hist2, int size) {
+    double mean1 = 0.0, mean2 = 0.0;
+    for (int i = 0; i < size; i++) {
+        mean1 += hist1[i];
+        mean2 += hist2[i];
+    }
+    mean1 /= size;
+    mean2 /= size;
+
+    double var1 = 0.0, var2 = 0.0, cov = 0.0;
+    for (int i = 0; i < size; i++) {
+        double diff1 = hist1[i] - mean1;
+        double diff2 = hist2[i] - mean2;
+                cov += diff1 * diff2;
+				var1 += diff1 * diff1;
+				var2 += diff2 * diff2;
+				}
+    var1 /= size;
+    var2 /= size;
+    cov /= size;
+
+    double similarity = cov / sqrt(var1 * var2);
+    return similarity;
+}
+
+int main() {
+    // Leitura das imagens PGM
+    int width1, height1;
+    int** image1 = readPGM("white.pgm", &width1, &height1);
+    if (!image1) {
+        return -1;
+    }
+
+    int width2, height2;
+    int** image2 = readPGM("black.pgm", &width2, &height2);
+    if (!image2) {
+        freeImage(image1, height1);
+        return -1;
+    }
+
+    // Verifica se as dimensões das imagens são compatíveis
+    if (width1 != width2 || height1 != height2) {
+        printf("As imagens têm dimensões diferentes.\n");
+        freeImage(image1, height1);
+        freeImage(image2, height2);
+        return -1;
+    }
+
+    // Calcula os histogramas das imagens
+	int size = MAX_PIXEL_VALUE + 1;
+	int histogram1[size];
+	int histogram2[size];
+	memset(histogram1, 0, size * sizeof(int));
+	memset(histogram2, 0, size * sizeof(int));
+	calculateHistogram(image1, width1, height1, histogram1);
+	calculateHistogram(image2, width2, height2, histogram2);
+
+
+    // Calcula a similaridade entre os histogramas
+    double similarity = calculateSimilarity(histogram1, histogram2, size)*100;
+    printf("O score de similaridade corresponde a: %f%%\n", similarity);
+
+    // Libera a memória alocada
+    freeImage(image1, height1);
+    freeImage(image2, height2);
+
+    return 0;
+}
